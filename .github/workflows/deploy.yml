@@ -1,1 +1,52 @@
+name: Deploy Urlaubsplaner
 
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Läuft immer nur eine Veröffentlichung gleichzeitig
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  bauen:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.veroeffentlichen.outputs.page_url }}
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Abhängigkeiten installieren
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Frontend bauen
+        working-directory: frontend
+        run: npm run build
+
+      - name: Pages vorbereiten
+        uses: actions/configure-pages@v5
+
+      - name: Ergebnis hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+      - name: Veröffentlichen
+        id: veroeffentlichen
+        uses: actions/deploy-pages@v4
