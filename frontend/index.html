@@ -1,1 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Urlaubsplaner – TZ Westlausitz</title>
 
+    <!-- Favicon für Browser-Tab -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+
+    <!-- Apple Touch Icon: Safari Favoriten + "Zum Home-Bildschirm" -->
+    <!-- 180x180px = Standard für alle modernen iPhones/iPads -->
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
+    <!-- iOS PWA Einstellungen -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="TZ-Urlaub" />
+
+    <!-- Android / PWA Manifest -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#5a8a1f" />
+
+    <!-- Windows Kachel -->
+    <meta name="msapplication-TileImage" content="apple-touch-icon.png" />
+    <meta name="msapplication-TileColor" content="#5a8a1f" />
+
+    <!-- Open Graph (für geteilte Links) -->
+    <meta property="og:title" content="Urlaubsplaner – TZ Westlausitz" />
+    <meta property="og:image" content="apple-touch-icon.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
