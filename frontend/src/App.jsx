@@ -533,6 +533,18 @@ function tageBisGeburtstag(iso){
 // Benutzern beim nächsten Anmelden den Hinweis.
 const CHANGELOG=[
   {
+    version:"2026.11.23",
+    datum:"23. November 2026",
+    titel:"Anmeldung, Pauschalkräfte und direkte Urlaubsplanung",
+    punkte:[
+      "Die Anmeldemaske behält die eingetippte E-Mail-Adresse, wenn man kurz in eine andere App wechselt — etwa um das Passwort aus dem E-Mail-Programm zu kopieren. Das Passwort selbst wird aus Sicherheitsgründen nie gespeichert.",
+      "Pauschalkräfte können von der Leitung so eingestellt werden, dass ihr Urlaub keine Genehmigung braucht. Die Einträge gelten dann sofort als bestätigt. Einstellbar beim Anlegen und jederzeit später.",
+      "Der rote Hinweis „Jetzt Urlaub für … planen“ führt mit einem Klick direkt in die Urlaubsplanung des betroffenen Jahres — der Eingabedialog öffnet sich gleich mit.",
+      "Der Menüpunkt „Einträge“ heißt jetzt „Urlaubseinträge“.",
+      "Der eigene Urlaubsantrag kann nicht mehr selbst genehmigt werden. Darüber entscheidet ausschließlich die zuständige Leitung.",
+    ],
+  },
+  {
     version:"2026.08.25",
     datum:"25. August 2026",
     titel:"Zusatzrechte und Regeln je Bereich",
@@ -925,6 +937,11 @@ export default function App(){
       // Ist gerade ein Fenster geöffnet (z. B. Mitarbeiter anlegen)? Dann NICHTS tun,
       // was Eingaben vernichten könnte — kein Neuladen, kein Ladebildschirm.
       if(modalOffenRef.current)return;
+
+      // Niemand angemeldet? Dann steht die Anmeldemaske auf dem Bildschirm.
+      // Hier gibt es nichts aufzufrischen — ein Neustart würde nur die bereits
+      // eingetippte E-Mail und das Passwort löschen.
+      if(!sess&&!sessionAusSpeicher())return;
 
       // Neuer Tag angebrochen, während die App im Hintergrund lag → abmelden
       if(sess&&sessionAbgelaufen(sess)){
@@ -1369,7 +1386,10 @@ export default function App(){
     }
     const zielProfil=profiles.find(p=>p.id===user_id)||null;
     // Wer den Zielmitarbeiter führen darf, trägt direkt bestätigt ein (eigener Urlaub nicht)
-    const sofortBestaetigt=isAdmin||(user_id!==profile?.id&&canManage(profile,zielProfil,zusatzrechte));
+    // Pauschalkräfte ohne Genehmigungspflicht tragen frei ein — ohne Antrag.
+    const ohneGenehmigung=istPauschal(zielProfil)&&zielProfil?.genehmigung_noetig===false;
+    const sofortBestaetigt=isAdmin||ohneGenehmigung
+      ||(user_id!==profile?.id&&canManage(profile,zielProfil,zusatzrechte));
     // Konfliktcheck (Mitarbeiter)
     if(!sofortBestaetigt){
       // Nur Überschneidungen im eigenen Fachbereich sind relevant
@@ -1382,7 +1402,9 @@ export default function App(){
     const e=await createEntry({user_id,type,von,bis,note});
     if(sofortBestaetigt){await setEntryStatus(e.id,"confirmed");}
     await loadEntries(isLeitung,session.user.id);
-    notify(sofortBestaetigt?"Eintrag bestätigt gespeichert.":"Urlaubsantrag eingereicht – wartet auf Genehmigung.");
+    notify(ohneGenehmigung&&user_id===profile?.id
+      ? "Urlaub eingetragen."
+      : sofortBestaetigt?"Eintrag bestätigt gespeichert.":"Urlaubsantrag eingereicht – wartet auf Genehmigung.");
   }
   async function handleUpdateEntry(id,data){
     await updateEntry(id,data);
@@ -1594,7 +1616,7 @@ export default function App(){
   }
 
   const navItems=isLeitung
-    ?[["kalender","📅 Kalender"],["dashboard","📊 Dashboard"],["mitarbeiter","👥 Mitarbeiter"],["eintraege","📋 Einträge"],
+    ?[["kalender","📅 Kalender"],["dashboard","📊 Dashboard"],["mitarbeiter","👥 Mitarbeiter"],["eintraege","📋 Urlaubseinträge"],
       ...(isAdmin?[]:[["meinurlaub","🏖 Mein Urlaub"]]),
       ["feiertage","🗓 Ferien & Feiertage"],
       ...(isAdmin?[["protokoll","🔍 Protokoll"]]:[]),
@@ -1861,7 +1883,13 @@ export default function App(){
           offeneLeute={isLeitung?meineLeute.filter(u=>!istPauschal(u)&&planungFuer(u,planJahr).anteil<mindestAnteil(regelnFuer(u))):[]}
           regeln={regelnFuer(pwu.find(u=>u.id===session.user.id)||profile)} user={pwu.find(u=>u.id===session.user.id)||profile}
           istLeitung={isLeitung} darfBereichFiltern={darfBereichFiltern}
-          onPlanen={()=>{if(year!==planJahr)setYear(planJahr);setView(isAdmin?"eintraege":"meinurlaub");}}/>
+          onPlanen={()=>{
+            // Direkt in die Planung des betroffenen Jahres springen und
+            // den Antragsdialog für die eigene Person gleich öffnen.
+            if(year!==planJahr)setYear(planJahr);
+            setView(isLeitung?"eintraege":"meinurlaub");
+            setModal({type:"addEntry",data:{userId:session.user.id}});
+          }}/>
         {view==="kalender"&&<KalView key={"kal"+kalTick} year={year} entries={calEntries()} profiles={profiles} bl={bundesland} showFerien={showFerien} showFeiertage={showFeiertage} onTip={setTooltip} offTip={()=>setTooltip(null)}/>}
         {view==="dashboard"&&<DashView users={isLeitung?meineLeute:(pwu.find(u=>u.id===session.user.id)?pwu.filter(u=>u.id===session.user.id):(profile?[{...profile,entries:entries.filter(e=>e.user_id===session.user.id)}]:[]))} isAdmin={isLeitung} viewer={profile} year={year} refreshKey={dashRefresh} onEdit={u=>setModal({type:"editUser",data:u})} onResetPwForUser={(d)=>setModal({type:"resetPw",data:d})}/>}
         {view==="mitarbeiter"&&isLeitung&&<MitView users={meineLeute} bearbeitbar={meineBearbeitbaren.map(u=>u.id)} viewer={profile} canDelete={isAdmin}
@@ -2054,7 +2082,9 @@ function ForceChangePassword({user,onDone}){
           <div style={{fontSize:44,marginBottom:8}}>🔐</div>
           <div style={{fontSize:20,fontWeight:800,color:"#2d3a2e",fontFamily:"'Nunito',sans-serif"}}>Neues Passwort festlegen</div>
           <div style={{fontSize:13,color:"#6b8f74",marginTop:8,lineHeight:1.5}}>
-            Hallo {user?.vorname}, dein Passwort wurde zurückgesetzt. Bitte lege jetzt dein persönliches Passwort fest.
+            Hallo {user?.vorname}, das Passwort, mit dem du dich gerade angemeldet hast,
+            ist der Leitung bekannt — sie hat es für dich vergeben. Bitte lege deshalb jetzt
+            ein eigenes fest, das nur du kennst. Danach wirst du nicht wieder danach gefragt.
           </div>
         </div>
         <div style={{marginBottom:14,position:"relative"}}>
@@ -2111,7 +2141,17 @@ function LoginScreen({onLogin}){
       return !!v;
     }catch(e){return false;}
   });
-  const [email,setEmail]=useState("");
+  // iOS verwirft die Seite beim App-Wechsel. Damit die eingetippte Adresse
+  // nicht verloren geht, wird sie zwischengespeichert — das Passwort niemals.
+  const [email,setEmail]=useState(()=>{
+    try{return localStorage.getItem("up_login_email")||"";}catch(e){return "";}
+  });
+  useEffect(()=>{
+    try{
+      if(email.trim())localStorage.setItem("up_login_email",email.trim());
+      else localStorage.removeItem("up_login_email");
+    }catch(e){}
+  },[email]);
   const [pw,setPw]=useState("");
   const [showPw,setShowPw]=useState(false);
   const [err,setErr]=useState("");
@@ -3206,7 +3246,7 @@ function HilfeView({user,istLeitung,isAdmin}){
             <strong> Einträge</strong> — beschränkt auf die Personen, für die du zuständig bist.
           </p>
           <ul style={{paddingLeft:20,margin:"0 0 10px"}}>
-            <li style={LI}><strong>Anträge entscheiden:</strong> Unter „📋 Einträge“ stehen offene Anträge
+            <li style={LI}><strong>Anträge entscheiden:</strong> Unter „📋 Urlaubseinträge“ stehen offene Anträge
               oben. Mit ✓ genehmigen, mit ✗ ablehnen. Die gelbe Zahl in der Kopfzeile zeigt, wie viele
               offen sind.</li>
             <li style={LI}><strong>Überschneidungen:</strong> Die App warnt, wenn im selben Fachbereich
@@ -3911,7 +3951,7 @@ function EintAdmin({entries,profiles,year,onStatus,onDelete,onAdd,onEdit,viewer,
   return(
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:8}}>
-        <h2 style={S.pgT}>Einträge {year}</h2>
+        <h2 style={S.pgT}>Urlaubseinträge {year}</h2>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {profiles.filter(u=>passt(u.id)).map(u=><button key={u.id} style={{...S.addBtn,background:u.color||"#2563EB",fontSize:11,padding:"6px 10px"}} onClick={()=>onAdd(u.id)}>+ {u.vorname}</button>)}
         </div>
@@ -4653,6 +4693,7 @@ function UserModal({title,initial,isAdmin,onSave,onClose,onResetPw,belegteFarben
     email:initial?.email||"",role:initial?.role||"mitarbeiter",
     geschlecht:initial?.geschlecht||"",
     pauschal:initial?.pauschal??false,
+    genehmigung_noetig:initial?.genehmigung_noetig??true,
     fronleichnam:initial?.fronleichnam??false,
     frist_datum:initial?.frist_datum||"",
     mindest_prozent:initial?.mindest_prozent??null,
@@ -4714,6 +4755,7 @@ function UserModal({title,initial,isAdmin,onSave,onClose,onResetPw,belegteFarben
     try{
       entwurfLoeschen();
       await onSave({...f,email:f.email.trim().toLowerCase(),pauschal:!!f.pauschal,fronleichnam:!!f.fronleichnam,
+        genehmigung_noetig:f.pauschal?(f.genehmigung_noetig!==false):true,
         frist_datum:f.frist_datum||null,
         mindest_prozent:f.mindest_prozent===null||f.mindest_prozent===""?null:parseInt(f.mindest_prozent),
         ueberstunden_erlaubt:f.ueberstunden_erlaubt,wochenstunden:f.pauschal?0:(parseFloat(f.wochenstunden)||0),arbeitstage_woche:f.pauschal?0:(parseInt(f.arbeitstage_woche)||5),urlaubstage:f.pauschal?0:(parseInt(f.urlaubstage)||0),ueberstunden:f.pauschal?0:(parseInt(f.ueberstunden)||0),resturlaub:f.pauschal?0:(parseInt(f.resturlaub)||0),geburtsdatum:f.geburtsdatum||null,einstellungsdatum:f.einstellungsdatum||null,...(!initial?{password:newUserPw}:{})});
@@ -4846,6 +4888,21 @@ Thomas Keilig`;
                 </div>
               </span>
             </label>
+            {f.pauschal&&(
+              <div><label style={S.lbl}>Urlaub genehmigungspflichtig?</label>
+                <select style={S.inp}
+                  value={f.genehmigung_noetig===false?"nein":"ja"}
+                  onChange={e=>setF(p=>({...p,genehmigung_noetig:e.target.value==="ja"}))}>
+                  <option value="ja">Ja — die Teamleitung muss zustimmen</option>
+                  <option value="nein">Nein — Urlaub gilt sofort als eingetragen</option>
+                </select>
+                <div style={{fontSize:11,color:"#8aaa5f",marginTop:4,lineHeight:1.5}}>
+                  {f.genehmigung_noetig===false
+                    ? "Einträge dieser Person erscheinen sofort als bestätigt und landen nicht in der Genehmigungsliste."
+                    : "Einträge gehen wie üblich als Antrag an die zuständige Leitung."}
+                </div>
+              </div>
+            )}
             {!f.pauschal?(<>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 <div><label style={S.lbl}>Wochenarbeitszeit (Std.)</label>
