@@ -541,6 +541,8 @@ const CHANGELOG=[
       "Pauschalkräfte können von der Leitung so eingestellt werden, dass ihr Urlaub keine Genehmigung braucht. Die Einträge gelten dann sofort als bestätigt. Einstellbar beim Anlegen und jederzeit später.",
       "Der rote Hinweis „Jetzt Urlaub für … planen“ führt mit einem Klick direkt in die Urlaubsplanung des betroffenen Jahres — der Eingabedialog öffnet sich gleich mit.",
       "Der Menüpunkt „Einträge“ heißt jetzt „Urlaubseinträge“.",
+      "Druckfenster haben jetzt einen eigenen Knopf „Drucken / PDF“. Auf iPad und iPhone öffnete sich der Druckdialog bisher nicht von allein — darüber lässt sich die Übersicht auch als PDF sichern.",
+      "Bei Pauschalkräften ohne Genehmigungspflicht heißt es „Urlaub eintragen“ statt „Urlaub beantragen“.",
       "Der eigene Urlaubsantrag kann nicht mehr selbst genehmigt werden. Darüber entscheidet ausschließlich die zuständige Leitung.",
     ],
   },
@@ -706,6 +708,9 @@ const IST_IOS=(()=>{
 
 // Pauschalkraft: keine feste Wochenstundenzahl, kein fester Urlaubsanspruch
 const istPauschal=u=>!!u?.pauschal;
+// Pauschalkraft, deren Urlaub keine Genehmigung der Leitung braucht.
+// Für sie heißt es „eintragen“ statt „beantragen“ — es gibt keinen Antrag.
+const ohneGenehmigungspflicht=u=>!!u?.pauschal&&u?.genehmigung_noetig===false;
 const TYP_LABEL={urlaub:"Urlaub",resturlaub:"Resturlaub",ueberstunden:"Freizeitausgleich"};
 const ROLLEN=[["mitarbeiter","Mitarbeiter"],["admin","Administrator"]];
 const rolleLabel=r=>r==="admin"?"Administrator":"Mitarbeiter";
@@ -2011,7 +2016,7 @@ export default function App(){
         />
       )}
 
-      {modal?.type==="addEntry"&&<EntryModal title="Urlaubsantrag" year={year} isAdmin={isAdmin} allEntries={entries} currentUserId={session?.user.id}
+      {modal?.type==="addEntry"&&<EntryModal title={ohneGenehmigungspflicht(pwu.find(u=>u.id===modal.data.userId))?"Urlaub eintragen":"Urlaubsantrag"} year={year} isAdmin={isAdmin} allEntries={entries} currentUserId={session?.user.id}
         bereichVon={bereichVon} zielBereich={bereichVon(modal.data.userId)} zielUserId={modal.data.userId}
         zielUser={pwu.find(u=>u.id===modal.data.userId)}
         ueErlaubt={ueberstundenErlaubt(regelnFuer(pwu.find(u=>u.id===modal.data.userId)))}
@@ -2329,6 +2334,23 @@ function MonthCard({year,month,entries,profiles,bl,showFerien=true,showFeiertage
 }
 
 
+// ─── Kopfleiste der Druckfenster ─────────────────────────────────────────────
+// Safari auf iPad und iPhone führt window.print() beim Laden nicht zuverlässig
+// aus. Deshalb steht neben dem Schließen-Knopf immer ein Druck-Knopf bereit.
+// Über den Druckdialog lässt sich die Seite auch als PDF sichern.
+const DRUCK_KNOEPFE=
+  "<style>"
+ +".np,.dp{position:fixed;top:10px;z-index:9999;color:#fff;border:none;border-radius:8px;"
+ +"padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;"
+ +"box-shadow:0 2px 8px rgba(0,0,0,0.3);font-family:sans-serif;}"
+ +".np{right:14px;background:#dc2626;}"
+ +".dp{right:152px;background:#5a8a1f;}"
+ +"@media print{.np,.dp{display:none!important;}}"
+ +"@media(max-width:560px){.dp{right:14px;top:56px;}}"
+ +"</style>"
+ +"<button class=dp onclick=window.print()>Drucken / PDF</button>"
+ +"<button class=np onclick=window.close()>Schliessen</button>";
+
 // ─── PDF-Druck für Urlaubsübersicht ──────────────────────────────────────────
 function printUserPDF(u, year) {
   const w = window.open("about:blank","_pdf_"+Date.now(),"width=900,height=700");
@@ -2390,7 +2412,7 @@ function printUserPDF(u, year) {
     +"<div class='sigl'>Unterschrift Praxisleitung</div>"
     +"<div class='sign'>Genehmigt durch die Praxisleitung.</div></div></div>"
     +"<div class='foot'>Therapie- & Pflegezentrum Westlausitz · "+new Date().toLocaleDateString("de-DE")+"</div>"
-    +"<style>.np{position:fixed;top:10px;right:14px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);}@media print{.np{display:none!important;}}</style><button class=np onclick=window.close()>Schliessen</button>"+"<scr"+"ipt>window.onload=function(){window.print();}</scr"+"ipt></body></html>";
+    +DRUCK_KNOEPFE+"<scr"+"ipt>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},400);}</scr"+"ipt></body></html>";
   w.document.write(html);
   w.document.close();
 }
@@ -4185,14 +4207,14 @@ tr:nth-child(even) td{background:#f9fdf5;}
     <div class="sig-note">Genehmigt durch die Praxisleitung.</div>
   </div>
 </div>
-<div class="foot">Therapie- & Pflegezentrum Westlausitz · Urlaubsplaner · Erstellt am ${new Date().toLocaleDateString("de-DE")}</div><style>.np{position:fixed;top:10px;right:14px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);}@media print{.np{display:none!important;}}</style><button class=np onclick=window.close()>Schliessen</button>
-<script>window.onload=()=>window.print();</script>
+<div class="foot">Therapie- & Pflegezentrum Westlausitz · Urlaubsplaner · Erstellt am ${new Date().toLocaleDateString("de-DE")}</div>${DRUCK_KNOEPFE}
+<script>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},400);}</script>
 </body></html>`);
             w.document.close();
           }} style={{background:"#475569",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
             🖨 PDF / Drucken
           </button>
-          <button style={{...S.addBtn,background:user?.color||"#5a8a1f"}} onClick={onAdd}>+ Urlaub beantragen</button>
+          <button style={{...S.addBtn,background:user?.color||"#5a8a1f"}} onClick={onAdd}>{ohneGenehmigungspflicht(user)?"+ Urlaub eintragen":"+ Urlaub beantragen"}</button>
           {!istPauschal(user)&&<button style={{...S.canBtn,fontWeight:700}} onClick={()=>setUeFormular(v=>!v)}>⏱ Überstunden melden</button>}
         </div>
       </div>
@@ -5443,9 +5465,13 @@ function EntryModal({title,year,isAdmin,initial,onSave,onClose,allEntries,curren
               }
             </div>
           )}
-          {!isAdmin&&<div style={{fontSize:11,color:"#8aaa5f",marginTop:6}}>Dein Antrag wird dem Administrator zur Genehmigung vorgelegt.</div>}
+          {!isAdmin&&<div style={{fontSize:11,color:"#8aaa5f",marginTop:6}}>
+            {ohneGenehmigungspflicht(zielUser)
+              ? "Dein Urlaub wird ohne Genehmigung direkt eingetragen."
+              : "Dein Antrag wird dem Administrator zur Genehmigung vorgelegt."}
+          </div>}
         </div>
-        <div style={S.mFt}><button style={{...S.savBtn,opacity:(busy||blockiert)?0.5:1,cursor:blockiert?"not-allowed":"pointer"}} onClick={save} disabled={busy||blockiert} title={!zeitraumGesetzt?"Bitte zuerst den Zeitraum wählen":blockiert?"Speichern derzeit nicht möglich – siehe Hinweise oben":""}>{isAdmin?"Speichern":"Beantragen"}</button><button style={S.canBtn} onClick={onClose}>Abbrechen</button></div>
+        <div style={S.mFt}><button style={{...S.savBtn,opacity:(busy||blockiert)?0.5:1,cursor:blockiert?"not-allowed":"pointer"}} onClick={save} disabled={busy||blockiert} title={!zeitraumGesetzt?"Bitte zuerst den Zeitraum wählen":blockiert?"Speichern derzeit nicht möglich – siehe Hinweise oben":""}>{isAdmin?"Speichern":ohneGenehmigungspflicht(zielUser)?"Eintragen":"Beantragen"}</button><button style={S.canBtn} onClick={onClose}>Abbrechen</button></div>
       </div>
     </div>
   );
@@ -5528,8 +5554,8 @@ function PrintKal({year,entries,profiles,state,stateName,onClose,useNewWindow=fa
       +'<div style="display:flex;align-items:center;gap:3px;font-size:7px"><div style="width:7px;height:7px;border-radius:50%;background:#fce7f3;border:1px solid #f9a8d4"></div><span>Schulferien</span></div>'
       +'<div style="display:flex;align-items:center;gap:3px;font-size:7px"><div style="width:7px;height:7px;border-radius:50%;background:#d4b896;border:1px solid #c9a07a"></div><span>Feiertage</span></div>'
       +'</div>'
-      +'<style>.np{position:fixed;top:10px;right:14px;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);}@media print{.np{display:none!important;}}</style><button class=np onclick=window.close()>Schliessen</button>'
-      +'<script>window.onload=function(){window.print();}<'+'/script>'
+      +DRUCK_KNOEPFE
+      +'<script>window.onload=function(){setTimeout(function(){try{window.print();}catch(e){}},400);}<'+'/script>'
       +'</body></html>';
 
     w.document.write(html);
